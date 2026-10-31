@@ -38,3 +38,29 @@ pytest -q
 - Use an explicit object-oriented design.
 - Keep one main class per source file.
 
+
+## Design notes
+
+| Role | Class |
+| --- | --- |
+| Component | `Message` |
+| Concrete Component | `PlainMessage` |
+| Decorator | `MessageDecorator` |
+| Concrete Decorators | `UrgentDecorator`, `TimestampDecorator` |
+
+Every decorator is a `Message` and holds another `Message`, so they can be stacked in any order:
+
+```python
+TimestampDecorator(UrgentDecorator(PlainMessage("Deploy complete")))
+# [2026-10-30 09:15] [URGENT] Deploy complete
+```
+
+`TimestampDecorator` receives a `clock` callable (defaults to `datetime.now`), so tests inject a fixed time and stay deterministic.
+
+### Does order matter?
+
+Yes. Each decorator adds its prefix around whatever it wraps, so the outermost decorator's text appears first. `Timestamp(Urgent(msg))` and `Urgent(Timestamp(msg))` render different strings. The test covers both orders.
+
+### Complexity cost
+
+The final behavior is spread across a chain of small objects instead of one class. Reading the code that builds the chain is the only way to know what a message will render, and the result changes if the wrapping order changes. Debugging means stepping through every layer, and identity checks or `isinstance` against `PlainMessage` no longer work once the message is wrapped.
